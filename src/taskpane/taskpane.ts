@@ -12,7 +12,6 @@ Office.onReady((info) => {
   if (info.host === Office.HostType.Excel) {
     document.getElementById("sideload-msg").style.display = "none";
     document.getElementById("app-body").style.display = "flex";
-    document.getElementById("run").onclick = run;
     document.getElementById("submitName").onclick = submitName;
   }
 });
@@ -27,19 +26,22 @@ declare global {
   var curPlayerName: string;
   var initMoney: number;
   var playerInfoDict: Dictionary<string, PlayerProp>;
+  var smallBlind: number;
 }
 globalThis.initMoney = 5000;
 globalThis.playerInfoDict = new Dictionary();
 globalThis.playerInfoSheetName = "playerInfo";
+globalThis.smallBlind = 0;
 
-export async function run() {
+export async function prepareTableAndSheet() {
   globalThis.gameSheetName = "GameRoom";
   globalThis.scoreTableName = "scoreTable";
   globalThis.cardTableName = "cardTable";
-  globalThis.scoreTableAddr = "C9:J9";
+  globalThis.scoreTableAddr = "C9:L9";
   globalThis.cardTableAddr = "E18:G18";
   try {
     await Excel.run(async (context) => {
+      updatePlayersInfo();
       var sheets = context.workbook.worksheets;
       await createWorksheetIfNotExist(globalThis.gameSheetName);
       await context.sync();
@@ -52,7 +54,7 @@ export async function run() {
         globalThis.scoreTableName,
         globalThis.scoreTableAddr,
         true,
-        [["Position", "PlayerName", "Money", "Pre-flop", "Flop", "Turn", "River", "Pot"]]
+        [["Position", "PlayerName", "Action", "Call number", "Money", "Pre-flop", "Flop", "Turn", "River", "Pot"]]
       );
       await createTableIfNotExist(globalThis.gameSheetName, globalThis.cardTableName, globalThis.cardTableAddr, true, [
         ["PlayerName", "Card1", "Card2"],
@@ -63,6 +65,22 @@ export async function run() {
       var cardTable = gameSheet.tables.getItemOrNullObject(globalThis.cardTableName);
       scoreTable.getHeaderRowRange().format.autofitColumns();
       cardTable.getHeaderRowRange().format.autofitColumns();
+      cardTable.autoFilter.clearCriteria();
+
+      await globalThis.playerInfoDict.forEach(async function (key, value) {
+        var nameIsInScoreTable = await nameInTable(key, globalThis.scoreTableName, 1);
+        var nameIsInCardTable = await nameInTable(key, globalThis.cardTableName, 0);
+        await context.sync();
+        console.log("boo:" + nameIsInCardTable + "," + nameIsInCardTable);
+        if (!nameIsInScoreTable) {
+          scoreTable.rows.add(-1, [["", key, "", "", value.money, "", "", "", "", ""]]);
+        }
+        if (!nameIsInCardTable) {
+          cardTable.rows.add(-1, [[key, "", ""]]);
+        }
+        await context.sync();
+      });
+      await context.sync();
     });
   } catch (error) {
     console.error(error);
@@ -95,13 +113,66 @@ export async function submitName() {
       await context.sync();
       if (nameInTable.isNullObject) {
         playerInfoTable.rows.add(-1, [[globalThis.curPlayerName, "", globalThis.initMoney]]);
-        updatePlayersInfo();
       }
       playerInfoTable.getHeaderRowRange().format.autofitColumns();
+      await context.sync();
+
+      await prepareTableAndSheet();
+      await context.sync();
+
+      await createSheetView();
+      await context.sync();
+
+      var cardTable = context.workbook.worksheets
+        .getItem(globalThis.gameSheetName)
+        .tables.getItemOrNullObject(globalThis.cardTableName);
+      var view = context.workbook.worksheets
+        .getItem(globalThis.gameSheetName)
+        .namedSheetViews.getItem(globalThis.curPlayerName);
+      view.activate();
+      await context.sync();
+
+      var af = cardTable.autoFilter;
+      af.apply(cardTable.getDataBodyRange(), 0, {
+        filterOn: Excel.FilterOn.values,
+        values: [globalThis.curPlayerName],
+      });
       await context.sync();
     });
   } catch (error) {
     console.error(error);
+  }
+}
+
+async function createSheetView() {
+  try {
+    await Excel.run(async (context) => {
+      var views = context.workbook.worksheets.getItem(globalThis.gameSheetName).namedSheetViews;
+      views.add(globalThis.curPlayerName);
+    });
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+async function nameInTable(name: string, tablename: string, nameColIdx: number): Promise<boolean> {
+  try {
+    return await Excel.run(async (context) => {
+      var sheet = context.workbook.worksheets.getItem(globalThis.playerInfoSheetName);
+      var table = sheet.tables.getItem(tablename);
+      var nameInTable = table.columns.getItemAt(nameColIdx).getDataBodyRange().findOrNullObject(name, {
+        completeMatch: true,
+        matchCase: true,
+      });
+      await context.sync();
+      if (nameInTable.isNullObject) {
+        return false;
+      }
+      return true;
+    });
+  } catch (error) {
+    console.error(error);
+    return false;
   }
 }
 
