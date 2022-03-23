@@ -19,12 +19,15 @@
  .ms-welcome__header {
     padding: 20px;
     padding-bottom: 30px;
-    padding-top: 100px;
+    padding-top: 30px;
     display: -webkit-flex;
     display: flex;
     -webkit-flex-direction: column;
     flex-direction: column;
     align-items: center;
+    display:block;
+    width:100%;
+    /*height:200px;*/
  }
 
  .ms-welcome__main {

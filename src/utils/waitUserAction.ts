@@ -11,7 +11,7 @@ export function Countdown() {
     ringColor: "#ffc720", // 进度条环形颜色
     innerColor: "#4e84e5", // 最内圆底色
     fontSize: 50,
-    time: 5,
+    time: 2000,
   };
 }
 
@@ -145,17 +145,21 @@ Countdown.prototype.afterAction = function (action) {
   this.userAction = action;
 };
 
-Countdown.prototype.giveUp = function () {
-  console.log("give up");
-  this.afterAction("give up");
+Countdown.prototype.userCheck = function () {
+  console.log("check");
+  this.afterAction("check");
 };
-Countdown.prototype.addMoney = function () {
-  console.log("add money");
-  this.afterAction("add money");
+Countdown.prototype.userCall = function () {
+  console.log("call");
+  this.afterAction("call");
 };
-Countdown.prototype.allIn = function () {
-  console.log("all in");
-  this.afterAction("all in");
+Countdown.prototype.userRaise = function () {
+  console.log("raise");
+  this.afterAction("raise");
+};
+Countdown.prototype.userFold = function () {
+  console.log("fold");
+  this.afterAction("fold");
 };
 
 // 对象拷贝
@@ -167,9 +171,10 @@ function extend(obj1, obj2) {
 
 function addButton(targetParentId, value, callback) {
   //使用DOM的创建元素方法
-  var o = document.createElement("input");
-  o.type = "button";
+  var o = document.createElement("button");
+  //o.type = "button";
   o.value = value;
+  o.textContent = value;
 
   o.addEventListener("click", callback);
   var e = document.getElementById(targetParentId);
@@ -190,7 +195,7 @@ function deleteButton() {
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
-function updateTitle(title) {
+export function updateTitle(title) {
   var e = document.getElementById("whoisturn");
   e.textContent = title;
 }
@@ -199,30 +204,45 @@ function updateResult(title) {
   e.textContent = title;
 }
 
-export async function waitForUserAction(userName) {
-  updateTitle("Player: " + userName);
-  var ctd = new Countdown();
-  ctd.init({
-    callback: function () {
-      ctd.giveUp();
-    },
-  });
+export async function waitForUserAction(userName, isMyTurn) {
 
-  addButton("userButtons", "Give up", function(){
-    ctd.giveUp();
-  });
-  addButton("userButtons", "Add Money", function(){
-    ctd.addMoney();
-  });
-  addButton("userButtons", "All in", function(){
-    ctd.allIn();
-  });
+  if (isMyTurn)
+  {
+    updateTitle("Your turn: " + userName);
 
-  while (!ctd.userAction) {
-    await sleep(50);
+    var ctd = new Countdown();
+    ctd.init({
+      callback: function () {
+        ctd.userCheck();
+      },
+    });
+
+    addButton("userButtons", "check", function(){
+      ctd.userCheck();
+    });
+    addButton("userButtons", "call", function(){
+      ctd.userCall();
+    });
+    addButton("userButtons", "raise", function(){
+      ctd.userRaise();
+    });
+    addButton("userButtons", "fold", function(){
+      ctd.userFold();
+    });
+
+    while (!ctd.userAction) {
+      await sleep(50);
+    }
+    updateTitle(userName + " choose " + ctd.userAction);
+    return new Promise<string>((resolve) => {
+      resolve(ctd.userAction);
+    });
   }
-  updateResult(userName + " choose " + ctd.userAction);
-  return new Promise<string>((resolve) => {
-    resolve(ctd.userAction);
-  });
+  else {
+    updateTitle("Waiting player " + userName);
+    //var ctd = new Countdown();
+    //ctd.init({});
+  }
+
+  
 }
