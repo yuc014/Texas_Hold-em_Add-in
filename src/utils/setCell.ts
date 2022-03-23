@@ -1,18 +1,4 @@
-export enum Suits {
-  Heart = "H",
-  Spade = "S",
-  Diamond = "D",
-  Club = "C",
-}
-
-export class Card {
-  public constructor(rank: any, suit: any) {
-    this.suit = suit;
-    this.rank = rank;
-  }
-  public suit: Suits;
-  public rank: any;
-}
+import { Card, Suits } from "./card";
 
 export async function setCell(context, cell, card: Card) {
   var value = "";
