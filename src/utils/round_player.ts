@@ -1,18 +1,16 @@
 import { nanoid } from "nanoid";
+import { Card } from "./card";
 
 export default class RoundPlayer {
   currentBet: number;
   folded: boolean;
-  hand: any[];
-  winnings: number;
-  takenAction: boolean;
-  winner: boolean;
+  hand: Card[];
   chips: number;
   name: any;
   id: any;
 
-  constructor(name, folded, hand, chips, currentBet) {
-    this.id = nanoid;
+  constructor(name: string, folded: boolean, hand: Card[], chips: number, currentBet: number) {
+    this.id = nanoid();
     this.name = name;
     this.chips = chips; // total chips
     this.folded = folded;
