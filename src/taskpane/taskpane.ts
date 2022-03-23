@@ -1,3 +1,5 @@
+import { waitForUserAction, updateUITitle } from "../utils/waitUserAction";
+
 /*
  * Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT license.
  * See LICENSE in the project root for license information.
@@ -8,12 +10,14 @@
 import Dictionary from "./Dictionary";
 import PlayerProp from "./playerProp";
 
-Office.onReady((info) => {
+Office.onReady(async (info) => {
   if (info.host === Office.HostType.Excel) {
     document.getElementById("sideload-msg").style.display = "none";
     document.getElementById("app-body").style.display = "flex";
     document.getElementById("submitName").onclick = submitName;
     document.getElementById("start").onclick = start;
+
+    await registerOnChangeEvent();
   }
 });
 
@@ -33,9 +37,9 @@ globalThis.initMoney = 5000;
 globalThis.playerInfoDict = new Dictionary();
 globalThis.playerInfoSheetName = "playerInfo";
 globalThis.smallBlind = 0;
+globalThis.gameSheetName = "GameRoom";
 
 export async function prepareTableAndSheet() {
-  globalThis.gameSheetName = "GameRoom";
   globalThis.scoreTableName = "scoreTable";
   globalThis.cardTableName = "cardTable";
   globalThis.scoreTableAddr = "C9:L9";
@@ -148,10 +152,90 @@ export async function submitName() {
   }
 }
 
+async function onHighlight(e) {
+  console.log(e);
+  let address = e.address;
+
+  let turn = "";
+  let playerName = "";
+  let shouldIgnore = false;
+
+  try {
+    await Excel.run(async (context) => {
+      var worksheet = context.workbook.worksheets.getItem(globalThis.gameSheetName);
+      let a1 = worksheet.getRange("A1");
+      a1.load("values");
+      let range = worksheet.getRange(address).getColumnsBefore(1);
+      range.load("values");
+      let range2 = worksheet.getRange(address);
+      range2.load("format/fill/color");
+      range.load("values");
+      await context.sync();
+
+      // 消除highlight 某玩家完成了操作
+      if (range2.format.fill.color == "#FFFFFF") {
+        console.log("ignore format change");
+        console.log(range2.format.fill.color);
+        updateUITitle("");
+      }
+
+      if (range2.format.fill.color != "#FFC000") {
+        console.log("ignore format change");
+        console.log(range2.format.fill.color);
+        shouldIgnore = true;
+      }
+
+      playerName = range.values[0][0];
+
+      turn = a1.values[0][0];
+    });
+
+    if (shouldIgnore) {
+      return;
+    }
+
+    let isMyTurn = playerName == globalThis.curPlayerName;
+
+    let player1Result = await waitForUserAction(playerName, isMyTurn);
+    console.log(player1Result);
+    if (isMyTurn) {
+      let ua = new UserAction(globalThis.curPlayerName, turn);
+
+      if (player1Result == "call") {
+        await ua.call(0);
+      } else if (player1Result == "raise") {
+        await ua.raise(0);
+      } else if (player1Result == "check") {
+        await ua.check();
+      } else if (player1Result == "fold") {
+        await ua.fold();
+      }
+
+      await Excel.run(async (context) => {
+        var worksheet = context.workbook.worksheets.getItem(globalThis.gameSheetName);
+
+        let range = worksheet.getRange(address);
+        range.format.fill.clear();
+        await context.sync();
+      });
+    }
+  } catch (e) {
+    console.log(e);
+  }
+}
+
+async function registerOnChangeEvent() {
+  await Excel.run(async (context) => {
+    var worksheet = context.workbook.worksheets.getItem(globalThis.gameSheetName);
+    worksheet.onFormatChanged.add(onHighlight);
+  });
+}
+
 export async function start() {
   try {
     await Excel.run(async (context) => {
       // do the process
+
       await context.sync();
     });
   } catch (error) {
@@ -257,6 +341,8 @@ async function createTableIfNotExist(
         table.name = tableName;
       }
     });
+
+   
   } catch (error) {
     console.error(error);
   }
@@ -271,13 +357,13 @@ export class UserAction {
   }
 
   async call(amount: number) {
-    await changeScoreTableDataFromAction(this, "check", amount);
-    await changeInfoTableDataFromAction(this, "check", amount);
+    await changeScoreTableDataFromAction(this, "call", amount);
+    await changeInfoTableDataFromAction(this, "call", amount);
   }
 
   async raise(raiseAmount: number) {
-    await changeScoreTableDataFromAction(this, "check", raiseAmount);
-    await changeInfoTableDataFromAction(this, "check", raiseAmount);
+    await changeScoreTableDataFromAction(this, "raise", raiseAmount);
+    await changeInfoTableDataFromAction(this, "raise", raiseAmount);
   }
 
   // will not update actions for fold user
