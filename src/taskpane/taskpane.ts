@@ -13,6 +13,7 @@ Office.onReady((info) => {
     document.getElementById("sideload-msg").style.display = "none";
     document.getElementById("app-body").style.display = "flex";
     document.getElementById("submitName").onclick = submitName;
+    document.getElementById("start").onclick = start;
   }
 });
 
@@ -91,6 +92,9 @@ export async function submitName() {
   try {
     await Excel.run(async (context) => {
       globalThis.curPlayerName = (<HTMLInputElement>document.getElementById("playerName")).value;
+      if (globalThis.curPlayerName == "") {
+        return;
+      }
       await createWorksheetIfNotExist(globalThis.playerInfoSheetName);
       await context.sync();
 
@@ -137,6 +141,17 @@ export async function submitName() {
         filterOn: Excel.FilterOn.values,
         values: [globalThis.curPlayerName],
       });
+      await context.sync();
+    });
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+export async function start() {
+  try {
+    await Excel.run(async (context) => {
+      // do the process
       await context.sync();
     });
   } catch (error) {
@@ -241,6 +256,163 @@ async function createTableIfNotExist(
         }
         table.name = tableName;
       }
+    });
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+export class UserAction {
+  constructor(public playerName: string, public turn: string) {}
+
+  async check() {
+    await changeScoreTableDataFromAction(this, "check", 0);
+    await changeInfoTableDataFromAction(this, "check", 0);
+  }
+
+  async call(amount: number) {
+    await changeScoreTableDataFromAction(this, "check", amount);
+    await changeInfoTableDataFromAction(this, "check", amount);
+  }
+
+  async raise(raiseAmount: number) {
+    await changeScoreTableDataFromAction(this, "check", raiseAmount);
+    await changeInfoTableDataFromAction(this, "check", raiseAmount);
+  }
+
+  // will not update actions for fold user
+  async fold() {
+    await changeScoreTableDataFromAction(this, "fold", 0);
+    await changeInfoTableDataFromAction(this, "fold", 0);
+  }
+}
+
+async function changeScoreTableDataFromAction(_userAction: UserAction, action: string, _raiseAmount: number) {
+  try {
+    await Excel.run(async (context) => {
+      var tables = context.workbook.worksheets.getItemOrNullObject(globalThis.gameSheetName).tables;
+      var table = tables.getItem(globalThis.scoreTableName);
+      await context.sync();
+      var range = table.columns.getItemAt(1).getDataBodyRange().findOrNullObject(_userAction.playerName, {
+        completeMatch: true,
+        matchCase: true,
+      });
+      var actionRange = range.getColumnsAfter(1);
+      actionRange.values = [[action]];
+
+      var skipCount;
+      switch (_userAction.turn) {
+        case "pre-flop":
+          skipCount = 3;
+          break;
+        case "flop":
+          skipCount = 4;
+          break;
+        case "turn":
+          skipCount = 5;
+          break;
+        case "river":
+          skipCount = 6;
+          break;
+        default:
+          break;
+      }
+
+      var updateAddress = actionRange.getColumnsAfter(skipCount);
+      var potAddress = actionRange.getColumnsAfter(7);
+      var moneyAddress = actionRange.getColumnsAfter(2);
+      updateAddress.load("address");
+      potAddress.load("address");
+      moneyAddress.load("address");
+      await context.sync();
+
+      switch (action) {
+        case "check":
+          break;
+        case "call":
+          await updatePotAndData(updateAddress.address, potAddress.address, _raiseAmount);
+          await updateCurMoney(moneyAddress.address, _raiseAmount, globalThis.gameSheetName);
+          break;
+        case "raise":
+          await updatePotAndData(updateAddress.address, potAddress.address, _raiseAmount);
+          await updateCurMoney(moneyAddress.address, _raiseAmount, globalThis.gameSheetName);
+          break;
+        case "fold":
+          break;
+        default:
+          break;
+      }
+    });
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+async function changeInfoTableDataFromAction(_userAction: UserAction, action: string, _raiseAmount: number) {
+  try {
+    await Excel.run(async (context) => {
+      var tables = context.workbook.worksheets.getItemOrNullObject(globalThis.playerInfoSheetName).tables;
+      var table = tables.getItem(globalThis.playerInfoSheetName);
+      await context.sync();
+      var range = table.columns.getItemAt(0).getDataBodyRange().findOrNullObject(_userAction.playerName, {
+        completeMatch: true,
+        matchCase: true,
+      });
+      var actionRange = range.getColumnsAfter(1);
+      actionRange.values = [[action]];
+      var moneyAddress = actionRange.getColumnsAfter(1);
+      moneyAddress.load("address");
+      await context.sync();
+      switch (action) {
+        case "check":
+          break;
+        case "call":
+          await updateCurMoney(moneyAddress.address, _raiseAmount, globalThis.playerInfoSheetName);
+          break;
+        case "raise":
+          await updateCurMoney(moneyAddress.address, _raiseAmount, globalThis.playerInfoSheetName);
+          break;
+        case "fold":
+          break;
+        default:
+          break;
+      }
+    });
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+async function updatePotAndData(updateRange: string, potRange: string, addAmount: number) {
+  try {
+    await Excel.run(async (context) => {
+      var sheet = context.workbook.worksheets.getItemOrNullObject(globalThis.gameSheetName);
+      var updateR = sheet.getRange(updateRange);
+      var potR = sheet.getRange(potRange);
+      updateR.load("values");
+      potR.load("values");
+      await context.sync();
+      var newAmount = +updateR.values + addAmount;
+      var newPotAmount = +potR.values + addAmount;
+      updateR.values = [[newAmount]];
+      potR.values = [[newPotAmount]];
+      await context.sync();
+    });
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+async function updateCurMoney(updateRange: string, addAmount: number, sheetname: string) {
+  try {
+    await Excel.run(async (context) => {
+      var sheet = context.workbook.worksheets.getItemOrNullObject(sheetname);
+      var range = sheet.getRange(updateRange);
+      range.load("values");
+      await context.sync();
+      var newAmount = +range.values - addAmount;
+      range.values = [[newAmount]];
+      await context.sync();
     });
   } catch (error) {
     console.error(error);
