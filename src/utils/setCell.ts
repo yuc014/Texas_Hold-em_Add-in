@@ -1,22 +1,31 @@
 export enum Suits {
-  Heart,
-  Spade,
-  Diamond,
-  Club,
+  Heart = "H",
+  Spade = "S",
+  Diamond = "D",
+  Club = "C",
 }
 
-export async function setCell(context, cell, suit: Suits, card: any) {
+export class Card {
+  public constructor(rank: any, suit: any) {
+    this.suit = suit;
+    this.rank = rank;
+  }
+  public suit: Suits;
+  public rank: any;
+}
+
+export async function setCell(context, cell, card: Card) {
   var value = "";
   var color = "";
-  if (suit == Suits.Heart || suit == Suits.Diamond) {
-    if (suit == Suits.Heart) {
+  if (card.suit == Suits.Heart || card.suit == Suits.Diamond) {
+    if (card.suit == Suits.Heart) {
       value = "♥";
     } else {
       value = "♦";
     }
     color = "red";
   } else {
-    if (suit == Suits.Club) {
+    if (card.suit == Suits.Club) {
       value = "♣";
     } else {
       value = "♠";
@@ -24,7 +33,7 @@ export async function setCell(context, cell, suit: Suits, card: any) {
     color = "black";
   }
 
-  value += card;
+  value += card.rank;
 
   cell.values = [[value]];
   cell.format.font.color = color;
