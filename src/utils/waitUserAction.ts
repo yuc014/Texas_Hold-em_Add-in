@@ -195,7 +195,7 @@ function deleteButton() {
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
-export function updateTitle(title) {
+export function updateUITitle(title) {
   var e = document.getElementById("whoisturn");
   e.textContent = title;
 }
@@ -205,10 +205,8 @@ function updateResult(title) {
 }
 
 export async function waitForUserAction(userName, isMyTurn) {
-
-  if (isMyTurn)
-  {
-    updateTitle("Your turn: " + userName);
+  if (isMyTurn) {
+    updateUITitle("Your turn: " + userName);
 
     var ctd = new Countdown();
     ctd.init({
@@ -217,32 +215,29 @@ export async function waitForUserAction(userName, isMyTurn) {
       },
     });
 
-    addButton("userButtons", "check", function(){
+    addButton("userButtons", "check", function () {
       ctd.userCheck();
     });
-    addButton("userButtons", "call", function(){
+    addButton("userButtons", "call", function () {
       ctd.userCall();
     });
-    addButton("userButtons", "raise", function(){
+    addButton("userButtons", "raise", function () {
       ctd.userRaise();
     });
-    addButton("userButtons", "fold", function(){
+    addButton("userButtons", "fold", function () {
       ctd.userFold();
     });
 
     while (!ctd.userAction) {
       await sleep(50);
     }
-    updateTitle(userName + " choose " + ctd.userAction);
+    updateUITitle(userName + " choose " + ctd.userAction);
     return new Promise<string>((resolve) => {
       resolve(ctd.userAction);
     });
-  }
-  else {
-    updateTitle("Waiting player " + userName);
+  } else {
+    updateUITitle("Waiting player " + userName);
     //var ctd = new Countdown();
     //ctd.init({});
   }
-
-  
 }
