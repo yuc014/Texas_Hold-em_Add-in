@@ -1,5 +1,4 @@
 import { waitForUserAction, updateUITitle } from "../utils/waitUserAction";
-
 /*
  * Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT license.
  * See LICENSE in the project root for license information.
@@ -9,15 +8,19 @@ import { waitForUserAction, updateUITitle } from "../utils/waitUserAction";
 
 import Dictionary from "./Dictionary";
 import PlayerProp from "./playerProp";
+import { Card, Suits } from "../utils/Card";
+import { CardSet } from "./role/CardSet";
+import { setCell } from "src/utils/setCell";
+import RoundPlayer from "src/utils/round_player";
+import { chooseWinners } from "src/utils/rankHand";
 
 Office.onReady(async (info) => {
   if (info.host === Office.HostType.Excel) {
     document.getElementById("sideload-msg").style.display = "none";
     document.getElementById("app-body").style.display = "flex";
     document.getElementById("submitName").onclick = submitName;
-    document.getElementById("start").onclick = start;
-
-    await registerOnChangeEvent();
+    // document.getElementById("start").onclick = start;
+    // await registerOnChangeEvent();
   }
 });
 
@@ -30,14 +33,21 @@ declare global {
   var playerInfoSheetName: string;
   var curPlayerName: string;
   var initMoney: number;
+  var sheetname: string;
+  var communityCardTextBox: string;
   var playerInfoDict: Dictionary<string, PlayerProp>;
-  var smallBlind: number;
+  var smallBlind: number; // start from 1
+  var communityCard: Card[];
+  var cardSet: CardSet;
 }
+globalThis.sheetName = "Sheet1";
+globalThis.communityCardTextBox = "TextBox 3";
 globalThis.initMoney = 5000;
 globalThis.playerInfoDict = new Dictionary();
 globalThis.playerInfoSheetName = "playerInfo";
-globalThis.smallBlind = 0;
+globalThis.smallBlind = 1;
 globalThis.gameSheetName = "GameRoom";
+globalThis.communityCard = [];
 
 export async function prepareTableAndSheet() {
   globalThis.scoreTableName = "scoreTable";
@@ -85,6 +95,7 @@ export async function prepareTableAndSheet() {
         }
         await context.sync();
       });
+      gameSheet.getRange("L10").values = [["=SUM(H10:K10)"]];
       await context.sync();
     });
   } catch (error) {
@@ -152,6 +163,21 @@ export async function submitName() {
   }
 }
 
+function getCommunityCardsString(communityCards: Card[]) {
+  var result = "";
+  communityCards.forEach((communityCard) => {
+    result += communityCard.toDisplayString() + "  ";
+  });
+  return result;
+}
+
+function updateCommunityCards(context, communityCards: Card[]) {
+  var shapes = context.workbook.worksheets.getItem(globalThis.sheetname).shapes;
+  const communityCard = shapes.getItem(globalThis.communityCardTextBox);
+  var val = getCommunityCardsString(communityCards);
+  communityCard.textFrame.textRange.text = val;
+}
+
 async function onHighlight(e) {
   console.log(e);
   let address = e.address;
@@ -202,9 +228,9 @@ async function onHighlight(e) {
       let ua = new UserAction(globalThis.curPlayerName, turn);
 
       if (player1Result == "call") {
-        await ua.call(0);
+        await ua.call();
       } else if (player1Result == "raise") {
-        await ua.raise(0);
+        await ua.raise();
       } else if (player1Result == "check") {
         await ua.check();
       } else if (player1Result == "fold") {
@@ -234,8 +260,8 @@ async function registerOnChangeEvent() {
 export async function start() {
   try {
     await Excel.run(async (context) => {
+      
       // do the process
-
       await context.sync();
     });
   } catch (error) {
@@ -298,8 +324,10 @@ async function updatePlayersInfo() {
 async function updatePlayerInfo(name: string, status: string, money: number) {
   try {
     await Excel.run(async () => {
-      var player = new PlayerProp(name, status, money);
-      globalThis.playerInfoDict.set(name, player);
+      if (!globalThis.playerInfoDict.hasKey(name)) {
+        var player = new PlayerProp(name, status, money, null);
+        globalThis.playerInfoDict.set(name, player);
+      }
     });
   } catch (error) {
     console.error(error);
@@ -354,14 +382,16 @@ export class UserAction {
     await changeInfoTableDataFromAction(this, "check", 0);
   }
 
-  async call(amount: number) {
+  async call() {
+    var amount = await calCallAmt(this.playerName, 0);
     await changeScoreTableDataFromAction(this, "call", amount);
     await changeInfoTableDataFromAction(this, "call", amount);
   }
 
-  async raise(raiseAmount: number) {
-    await changeScoreTableDataFromAction(this, "raise", raiseAmount);
-    await changeInfoTableDataFromAction(this, "raise", raiseAmount);
+  async raise() {
+    var amount = await calCallAmt(this.playerName, 1);
+    await changeScoreTableDataFromAction(this, "raise", amount);
+    await changeInfoTableDataFromAction(this, "raise", amount);
   }
 
   // will not update actions for fold user
@@ -402,9 +432,9 @@ async function changeScoreTableDataFromAction(_userAction: UserAction, action: s
           break;
       }
 
-      var updateAddress = actionRange.getColumnsAfter(skipCount);
-      var potAddress = actionRange.getColumnsAfter(7);
-      var moneyAddress = actionRange.getColumnsAfter(2);
+      var updateAddress = actionRange.getOffsetRange(0, skipCount);
+      var potAddress = actionRange.getOffsetRange(0, 7);
+      var moneyAddress = actionRange.getOffsetRange(0, 2);
       updateAddress.load("address");
       potAddress.load("address");
       moneyAddress.load("address");
@@ -497,6 +527,273 @@ async function updateCurMoney(updateRange: string, addAmount: number, sheetname:
       var newAmount = +range.values - addAmount;
       range.values = [[newAmount]];
       await context.sync();
+    });
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+export async function initCardSet() {
+  globalThis.cardSet = new CardSet();
+  globalThis.cardSet.initCardSet();
+  globalThis.cardSet.shuffle();
+}
+
+export async function prepareCard(turn: number) {
+  try {
+    await Excel.run(async (context) => {
+      var turn = 1;
+      switch (turn) {
+        case 1:
+          await prepardHands();
+          break;
+        case 2:
+          globalThis.communityCard.push(parseCard(globalThis.cardSet.deal()));
+          globalThis.communityCard.push(parseCard(globalThis.cardSet.deal()));
+          globalThis.communityCard.push(parseCard(globalThis.cardSet.deal()));
+          await showCommunityCards();
+          break;
+        case 3:
+          globalThis.communityCard.push(parseCard(globalThis.cardSet.deal()));
+          await showCommunityCards();
+          break;
+        case 4:
+          globalThis.communityCard.push(parseCard(globalThis.cardSet.deal()));
+          await showCommunityCards();
+          break;
+        default:
+          break;
+      }
+      console.log(globalThis.playerInfoDict);
+      await context.sync();
+    });
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+function parseCard(cardName: string): Card {
+  var suit, rank;
+  switch (cardName.charAt(0)) {
+    case "♠":
+      suit = Suits.Spade;
+      break;
+    case "♥":
+      suit = Suits.Heart;
+      break;
+    case "♣":
+      suit = Suits.Club;
+      break;
+    case "■":
+      suit = Suits.Diamond;
+      break;
+    default:
+      break;
+  }
+  if (cardName.length == 3) {
+    rank = "T";
+  } else {
+    rank = cardName.substring(1);
+  }
+
+  return new Card(rank, suit);
+}
+
+async function showCommunityCards() {
+  try {
+    await Excel.run(async (context) => {
+      var sheet = context.workbook.worksheets.getItem(globalThis.gameSheetName);
+      var range = sheet.getRange("D4");
+      range.values = [["ComCards:"]];
+      range = range.getOffsetRange(0, 1);
+      for (let index = 0; index < globalThis.communityCard.length; index++) {
+        var card = globalThis.communityCard[index];
+        setCell(context, range, card);
+        range = range.getOffsetRange(0, 1);
+      }
+      await context.sync();
+    });
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+async function prepardHands() {
+  try {
+    await Excel.run(async (context) => {
+      await updatePlayersInfo();
+      await context.sync();
+
+      await globalThis.playerInfoDict.forEach(async function (key, value) {
+        value.hand = [];
+        value.hand.push(parseCard(globalThis.cardSet.deal()));
+        value.hand.push(parseCard(globalThis.cardSet.deal()));
+        await context.sync();
+      });
+
+      await showHands();
+      await context.sync();
+    });
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+async function showHands() {
+  try {
+    await Excel.run(async (context) => {
+      var sheet = context.workbook.worksheets.getItem(globalThis.gameSheetName);
+      var table = sheet.tables.getItem(globalThis.cardTableName);
+      table.autoFilter.clearCriteria();
+      await globalThis.playerInfoDict.forEach(function (key, value) {
+        var nameInTable = table.columns.getItemAt(0).getDataBodyRange().findOrNullObject(value.name, {
+          completeMatch: true,
+          matchCase: true,
+        });
+        nameInTable.load();
+        var range = nameInTable.getOffsetRange(0, 1);
+        setCell(context, range, value.hand[0]);
+        range = nameInTable.getOffsetRange(0, 2);
+        setCell(context, range, value.hand[1]);
+      });
+      await context.sync();
+      var af = table.autoFilter;
+      af.apply(table.getDataBodyRange(), 0, {
+        filterOn: Excel.FilterOn.values,
+        values: [globalThis.curPlayerName],
+      });
+      await context.sync();
+    });
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+async function calCallAmt(name: string, callOrRaise: number): Promise<number> {
+  try {
+    return await Excel.run(async (context) => {
+      var sheet = context.workbook.worksheets.getItem(globalThis.gameSheetName);
+      var table = sheet.tables.getItem(globalThis.scoreTableName);
+      var a1Range = sheet.getRange("A1");
+      a1Range.load();
+      await context.sync();
+      var turn = a1Range.values[0][0];
+      var newturn = turn.trim().split(":")[1];
+      console.log(newturn);
+
+      var nameInTable = table.columns.getItemAt(1).getDataBodyRange().findOrNullObject(name, {
+        completeMatch: true,
+        matchCase: true,
+      });
+
+      var offset;
+      switch (newturn) {
+        case "Pre-flop":
+          offset = 4;
+          break;
+        case "Flop round":
+          offset = 5;
+          break;
+        case "Turn round":
+          offset = 6;
+          break;
+        case "River round":
+          offset = 7;
+          break;
+        default:
+          break;
+      }
+      var curPotAddr = nameInTable.getOffsetRange(0, offset);
+      curPotAddr.load();
+      await context.sync();
+      var [[curPot]] = curPotAddr.values;
+      var colRange = table.columns.getItemAt(1 + offset).getDataBodyRange();
+      colRange.load();
+      await context.sync();
+
+      var maxPotRange = sheet.getRange("T1");
+      maxPotRange.values = [["=MAX(" + colRange.address + ")"]];
+      maxPotRange.load();
+      await context.sync();
+      var [[maxPot]] = maxPotRange.values;
+
+      if (curPot == "") {
+        curPot = "0";
+      }
+      var callAmt = +maxPot - +curPot;
+      maxPotRange.clear();
+      if (callOrRaise == 0) {
+        nameInTable.getOffsetRange(0, 2).values = [[callAmt]];
+      } else {
+        nameInTable.getOffsetRange(0, 2).values = [[2 * callAmt]];
+      }
+      return callAmt;
+    });
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+export async function getCurrentPlayers(): Promise<Array<number>> {
+  try {
+    return await Excel.run(async (context) => {
+      var sheet = context.workbook.worksheets.getItem(globalThis.playerInfoSheetName);
+      var table = sheet.tables.getItem(globalThis.playerInfoSheetName);
+      var dataRange = table.getDataBodyRange();
+      var resIdx = [];
+      dataRange.load();
+      await context.sync();
+      var data = dataRange.values;
+      for (let index = 0; index < data.length; index++) {
+        const element = data[index];
+        if (element[1] != "fold") {
+          resIdx.push(index + 1);
+        }
+      }
+      console.log(resIdx);
+      await context.sync();
+      return resIdx;
+    });
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+export async function gameFinish() {
+  try {
+    return await Excel.run(async (context) => {
+      var roundPlayers;
+      var table = context.workbook.worksheets
+        .getItem(globalThis.gameSheetName)
+        .tables.getItem(globalThis.scoreTableName);
+      await globalThis.playerInfoDict.forEach(function (key, value) {
+        var nameInTable = table.columns.getItemAt(1).getDataBodyRange().findOrNullObject(value.name, {
+          completeMatch: true,
+          matchCase: true,
+        });
+        nameInTable.load();
+        var range = nameInTable.getOffsetRange(0, 8);
+        range.load("values");
+        var player = new RoundPlayer(key, value.status == "fold", value.hand, value.money, +range.values[0][0]);
+        roundPlayers.push(player);
+      });
+
+      var winners = chooseWinners(globalThis.communityCard, roundPlayers);
+
+      await winners.forEach(function (element) {
+        var nameInTable = table.columns.getItemAt(1).getDataBodyRange().findOrNullObject(element.name, {
+          completeMatch: true,
+          matchCase: true,
+        });
+        nameInTable.load();
+        nameInTable.format.fill.color = "Green";
+        var Potrange = nameInTable.getOffsetRange(0, 3);
+        Potrange.values = [[element.chips]];
+      });
+
+      globalThis.playerInfoDict = new Dictionary();
+      globalThis.smallBlind += 1;
+      globalThis.communityCard = [];
     });
   } catch (error) {
     console.error(error);
