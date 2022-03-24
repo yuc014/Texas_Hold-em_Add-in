@@ -510,13 +510,13 @@ async function updateCurMoney(updateRange: string, addAmount: number, sheetname:
   }
 }
 
-async function initCardSet() {
+export async function initCardSet() {
   globalThis.cardSet = new CardSet();
   globalThis.cardSet.initCardSet();
   globalThis.cardSet.shuffle();
 }
 
-async function prepareCard(turn: number) {
+export async function prepareCard(turn: number) {
   try {
     await Excel.run(async (context) => {
       var turn = 1;
@@ -711,7 +711,7 @@ async function calCallAmt(name: string, callOrRaise: number): Promise<number> {
   }
 }
 
-async function getCurrentPlayers(): Promise<Array<number>> {
+export async function getCurrentPlayers(): Promise<Array<number>> {
   try {
     return await Excel.run(async (context) => {
       var sheet = context.workbook.worksheets.getItem(globalThis.playerInfoSheetName);
