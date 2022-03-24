@@ -9,19 +9,20 @@ import { waitForUserAction, updateUITitle } from "../utils/waitUserAction";
 
 import Dictionary from "./Dictionary";
 import PlayerProp from "./playerProp";
-import { Card, Suits } from "../utils/Card";
+import { Card, Suits } from "../utils/card";
 import { CardSet } from "./role/CardSet";
-import { setCell } from "src/utils/setCell";
-import RoundPlayer from "src/utils/round_player";
-import { chooseWinners } from "src/utils/rankHand";
+import { setCell } from "../utils/setCell";
+import RoundPlayer from "../utils/round_player";
+import { chooseWinners } from "../utils/rankHand";
+import { Banker } from "./role/Banker";
 
 Office.onReady(async (info) => {
   if (info.host === Office.HostType.Excel) {
     document.getElementById("sideload-msg").style.display = "none";
     document.getElementById("app-body").style.display = "flex";
     document.getElementById("submitName").onclick = submitName;
-    // document.getElementById("start").onclick = start;
-    // await registerOnChangeEvent();
+    document.getElementById("start").onclick = start;
+    await registerOnChangeEvent();
   }
 });
 
@@ -92,7 +93,6 @@ export async function prepareTableAndSheet() {
         }
         await context.sync();
       });
-      gameSheet.getRange("L10").values = [["=SUM(H10:K10)"]];
       await context.sync();
     });
   } catch (error) {
@@ -153,6 +153,14 @@ export async function submitName() {
         filterOn: Excel.FilterOn.values,
         values: [globalThis.curPlayerName],
       });
+      await context.sync();
+
+      var range = context.workbook.worksheets.getItem(globalThis.gameSheetName).tables.getItem(globalThis.scoreTableName).rows.getItemAt(0).getRange();
+      range.load();
+      await context.sync();
+      var rangeData = range.values;
+      rangeData[0][9] = "=SUM(H10:K10)";
+      range.values = rangeData;
       await context.sync();
     });
   } catch (error) {
@@ -243,6 +251,8 @@ export async function start() {
   try {
     await Excel.run(async (context) => {
       // do the process
+      var banker = new Banker();
+      banker.startGame();
       await context.sync();
     });
   } catch (error) {

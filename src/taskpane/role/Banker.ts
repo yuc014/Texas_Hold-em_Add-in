@@ -88,8 +88,8 @@ export class Banker {
       await prepareCard(this._round);
       this.process();
     } else {
-      await this.setPlayerBorders(this._currentPlayer, "Red");
-      this.highLightCell(this._currentPlayer + rowOffset, colOffset);
+     // await this.setPlayerBorders(this._currentPlayer, "Red");
+      this.highLightCell(this._currentPlayer + rowOffset, colOffset + 1);
     }
 
     return;
@@ -110,13 +110,13 @@ export class Banker {
     await Excel.run(async (context) => {
       let nameRange = context.workbook.worksheets.getItem('GameRoom').getRange(args.address);
       // offset = 3 (Action, Call number, Money);
-      let valueRange = nameRange.getOffsetRange(0, this._round + 3);
+      let valueRange = nameRange.getOffsetRange(0, this._round + 2);
       nameRange.load(["format"]);
       nameRange.format.load("fill");
       valueRange.load('values');
       await context.sync();
       if (nameRange.format.fill.color == "#FFFFFF") {
-        await this.setPlayerBorders(this._currentPlayer, "white");
+       // await this.setPlayerBorders(this._currentPlayer, "white");
         let value = parseInt(valueRange.values[0][0]);
         this.afterPlayerAction(value);
       }
@@ -138,7 +138,7 @@ export class Banker {
 
   private async checkIsStop(currentPlayerValue: number) {
     let nextPlayer = this.getNextPlayer();
-    let nextPlayerValue = await this.getCellValue(nextPlayer + rowOffset, this._round + colOffset + 3);
+    let nextPlayerValue = await this.getCellValue(nextPlayer + rowOffset, this._round + colOffset + 2);
 
     if (currentPlayerValue !== nextPlayerValue) {
       return false;
