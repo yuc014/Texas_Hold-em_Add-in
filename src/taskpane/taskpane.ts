@@ -21,7 +21,6 @@ Office.onReady(async (info) => {
     document.getElementById("app-body").style.display = "flex";
     document.getElementById("submitName").onclick = submitName;
     document.getElementById("start").onclick = start;
-    await registerOnChangeEvent();
   }
 });
 
@@ -158,13 +157,19 @@ export async function submitName() {
       });
       await context.sync();
 
-      var range = context.workbook.worksheets.getItem(globalThis.gameSheetName).tables.getItem(globalThis.scoreTableName).rows.getItemAt(0).getRange();
+      var range = context.workbook.worksheets
+        .getItem(globalThis.gameSheetName)
+        .tables.getItem(globalThis.scoreTableName)
+        .rows.getItemAt(0)
+        .getRange();
       range.load();
       await context.sync();
       var rangeData = range.values;
       rangeData[0][9] = "=SUM(H10:K10)";
       range.values = rangeData;
       await context.sync();
+
+      await registerOnChangeEvent();
     });
   } catch (error) {
     console.error(error);
@@ -213,7 +218,7 @@ async function onHighlight(e) {
         updateUITitle("");
       }
 
-      if (range2.format.fill.color != "#FFC000") {
+      if (range2.format.fill.color != "#FFA500") {
         console.log("ignore format change");
         console.log(range2.format.fill.color);
         shouldIgnore = true;

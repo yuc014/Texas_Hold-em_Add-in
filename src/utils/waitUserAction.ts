@@ -211,7 +211,7 @@ export async function waitForUserAction(userName, isMyTurn) {
     var ctd = new Countdown();
     ctd.init({
       callback: function () {
-        ctd.userCheck();
+        ctd.userFold();
       },
     });
 
