@@ -21,6 +21,7 @@ Office.onReady(async (info) => {
     document.getElementById("app-body").style.display = "flex";
     document.getElementById("submitName").onclick = submitName;
     document.getElementById("start").onclick = start;
+    await registerOnChangeEvent();
   }
 });
 
@@ -138,38 +139,38 @@ export async function submitName() {
       await prepareTableAndSheet();
       await context.sync();
 
-      await createSheetView();
-      await context.sync();
+      // await createSheetView();
+      // await context.sync();
 
-      var cardTable = context.workbook.worksheets
-        .getItem(globalThis.gameSheetName)
-        .tables.getItemOrNullObject(globalThis.cardTableName);
-      var view = context.workbook.worksheets
-        .getItem(globalThis.gameSheetName)
-        .namedSheetViews.getItem(globalThis.curPlayerName);
-      view.activate();
-      await context.sync();
+      // var cardTable = context.workbook.worksheets
+      //   .getItem(globalThis.gameSheetName)
+      //   .tables.getItemOrNullObject(globalThis.cardTableName);
+      // var view = context.workbook.worksheets
+      //   .getItem(globalThis.gameSheetName)
+      //   .namedSheetViews.getItem(globalThis.curPlayerName);
+      // view.activate();
+      // cardTable.load("autoFilter");
+      // await context.sync();
 
-      var af = cardTable.autoFilter;
-      af.apply(cardTable.getDataBodyRange(), 0, {
-        filterOn: Excel.FilterOn.values,
-        values: [globalThis.curPlayerName],
-      });
-      await context.sync();
+      // var af = cardTable.autoFilter;
+      // af.apply(cardTable.getDataBodyRange(), 0, {
+      //   filterOn: Excel.FilterOn.values,
+      //   values: [globalThis.curPlayerName],
+      // });
+      // await context.sync();
 
-      var range = context.workbook.worksheets
-        .getItem(globalThis.gameSheetName)
-        .tables.getItem(globalThis.scoreTableName)
-        .rows.getItemAt(0)
-        .getRange();
-      range.load();
-      await context.sync();
-      var rangeData = range.values;
-      rangeData[0][9] = "=SUM(H10:K10)";
-      range.values = rangeData;
-      await context.sync();
+      // var range = context.workbook.worksheets
+      //   .getItem(globalThis.gameSheetName)
+      //   .tables.getItem(globalThis.scoreTableName)
+      //   .rows.getItemAt(0)
+      //   .getRange();
+      // range.load();
+      // await context.sync();
+      // var rangeData = range.values;
+      // rangeData[0][9] = "=SUM(H10:K10)";
+      // range.values = rangeData;
+      // await context.sync();
 
-      await registerOnChangeEvent();
     });
   } catch (error) {
     console.error(error);
@@ -522,9 +523,11 @@ async function updatePotAndData(updateRange: string, potRange: string, addAmount
       potR.load("values");
       await context.sync();
       var newAmount = +updateR.values + addAmount;
+      console.log("@@@@@@@@@");
+      console.log(newAmount);
       var newPotAmount = +potR.values + addAmount;
       updateR.values = [[newAmount]];
-      potR.values = [[newPotAmount]];
+      //potR.values = [[newPotAmount]];
       await context.sync();
     });
   } catch (error) {
@@ -684,9 +687,10 @@ async function showHands() {
   }
 }
 
-async function calCallAmt(name: string, callOrRaise: number): Promise<number> {
+async function calCallAmt(name: string, callOrRaise: number) {
   try {
-    return await Excel.run(async (context) => {
+    var amt = 0;
+    await Excel.run(async (context) => {
       var sheet = context.workbook.worksheets.getItem(globalThis.gameSheetName);
       var table = sheet.tables.getItem(globalThis.scoreTableName);
       var a1Range = sheet.getRange("A1");
@@ -735,15 +739,15 @@ async function calCallAmt(name: string, callOrRaise: number): Promise<number> {
       if (curPot == "") {
         curPot = "0";
       }
-      var callAmt = +maxPot - +curPot;
+      amt = +maxPot - +curPot;
       maxPotRange.clear();
       if (callOrRaise == 0) {
-        nameInTable.getOffsetRange(0, 2).values = [[callAmt]];
+        nameInTable.getOffsetRange(0, 2).values = [[amt]];
       } else {
-        nameInTable.getOffsetRange(0, 2).values = [[2 * callAmt]];
+        nameInTable.getOffsetRange(0, 2).values = [[2 * amt]];
       }
-      return callAmt;
     });
+    return amt;
   } catch (error) {
     console.error(error);
   }

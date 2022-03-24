@@ -15,6 +15,7 @@ export class Banker {
 
   public async startGame() {
     await this.init();
+    await prepareCard(this._round);
     this.process();
   }
 
@@ -115,7 +116,7 @@ export class Banker {
       nameRange.format.load("fill");
       valueRange.load('values');
       await context.sync();
-      if (nameRange.format.fill.color == "#FFFFFF") {
+      if (args.address !== "T1" && nameRange.format.fill.color == "#FFFFFF") {
        // await this.setPlayerBorders(this._currentPlayer, "white");
         let value = parseInt(valueRange.values[0][0]);
         this.afterPlayerAction(value);
