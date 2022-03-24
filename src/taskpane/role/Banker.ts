@@ -19,7 +19,7 @@ export class Banker {
     if (!this._eventReady) {
       await Excel.run(async (context) => {
         let _this = this;
-        let worksheet = context.workbook.worksheets.getActiveWorksheet();
+        let worksheet = context.workbook.worksheets.getItem('GameRoom');
         await context.sync();
         worksheet.onFormatChanged.add(
           (args) =>
@@ -67,7 +67,7 @@ export class Banker {
 
   private async printValueToCell(address: string, value: string) {
     await Excel.run(async (context) => {
-      let cell = context.workbook.worksheets.getActiveWorksheet().getRange(address);
+      let cell = context.workbook.worksheets.getItem('GameRoom').getRange(address);
       cell.values = [[value]];
       cell.format.autofitColumns();
       await context.sync();
@@ -89,6 +89,7 @@ export class Banker {
         this.process();
       })();
     } else {
+      await this.setPlayerBorders(this._currentPlayer, "Red");
       this.highLightCell(this._currentPlayer + rowOffset, colOffset);
     }
 
@@ -108,7 +109,7 @@ export class Banker {
   // once the cell is un-highlighted (set the color to no fill)
   private async _formatChangedHandler(args: Excel.WorksheetFormatChangedEventArgs) {
     await Excel.run(async (context) => {
-      let nameRange = context.workbook.worksheets.getActiveWorksheet().getRange(args.address);
+      let nameRange = context.workbook.worksheets.getItem('GameRoom').getRange(args.address);
       // offset = 3 (Action, Call number, Money);
       let valueRange = nameRange.getOffsetRange(0, this._round + 3);
       nameRange.load(["format"]);
@@ -116,6 +117,7 @@ export class Banker {
       valueRange.load('values');
       await context.sync();
       if (nameRange.format.fill.color == "#FFFFFF") {
+        await this.setPlayerBorders(this._currentPlayer, "white");
         let value = parseInt(valueRange.values[0][0]);
         this.afterPlayerAction(value);
       }
@@ -163,7 +165,7 @@ export class Banker {
 
   async highLightCell(row, column) {
     await Excel.run(async (context) => {
-      let cell = context.workbook.worksheets.getActiveWorksheet().getCell(row, column);
+      let cell = context.workbook.worksheets.getItem('GameRoom').getCell(row, column);
       cell.load("format");
       cell.format.load("fill");
       await context.sync();
@@ -171,6 +173,19 @@ export class Banker {
       await context.sync();
     });
     return;
+  }
+
+  async setPlayerBorders(currentPlayer: number, color: string) {
+    await Excel.run(async (context) => {
+      let namedRange = context.workbook.worksheets.getItem("UI").getRange("player" + currentPlayer);
+      let borders = namedRange.format.borders;
+      borders.load('items');
+      await context.sync();
+      for (let i = 0; i < 4; i++) {
+        borders.items[i].color = color;
+      }
+      await context.sync();
+    });
   }
 
   async getCellValue(row, column) {
