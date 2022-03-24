@@ -710,3 +710,28 @@ async function calCallAmt(name: string, callOrRaise: number): Promise<number> {
     console.error(error);
   }
 }
+
+async function getCurrentPlayers(): Promise<Array<number>> {
+  try {
+    return await Excel.run(async (context) => {
+      var sheet = context.workbook.worksheets.getItem(globalThis.playerInfoSheetName);
+      var table = sheet.tables.getItem(globalThis.playerInfoSheetName);
+      var dataRange = table.getDataBodyRange();
+      var resIdx = [];
+      dataRange.load();
+      await context.sync();
+      var data = dataRange.values;
+      for (let index = 0; index < data.length; index++) {
+        const element = data[index];
+        if (element[1] != "fold") {
+          resIdx.push(index + 1);
+        }
+      }
+      console.log(resIdx);
+      await context.sync();
+      return resIdx;
+    });
+  } catch (error) {
+    console.error(error);
+  }
+}
