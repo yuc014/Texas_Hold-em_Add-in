@@ -1,6 +1,9 @@
+import { getCurrentPlayers, prepareCard } from '../taskpane';
+
 var rowOffset = 0;
 var colOffset = 0;
 var smallBlind = 1;
+
 export class Banker {
   private roundNum = 4;
   private _round: number;
@@ -36,8 +39,7 @@ export class Banker {
     await this.setRound(1);
     this._currentPlayer = smallBlind + 2;
     this._roundStop = false;
-    this.currentPlayers = [1, 2, 3, 4];
-    // this.currentPlayers =
+    this.currentPlayers = await getCurrentPlayers();
   }
 
   private async setRound(round: number) {
@@ -83,11 +85,8 @@ export class Banker {
     }
 
     if (this.getCurrentPlayerOrNull() === null) {
-      //current round is finished
-      //deal and callback
-      (() => {
-        this.process();
-      })();
+      await prepareCard(this._round);
+      this.process();
     } else {
       await this.setPlayerBorders(this._currentPlayer, "Red");
       this.highLightCell(this._currentPlayer + rowOffset, colOffset);
@@ -129,7 +128,7 @@ export class Banker {
     this._roundStop = await this.checkIsStop(value);
     this._currentPlayer = this.getNextPlayer();
 
-    //this.currentPlayers = get
+    this.currentPlayers = await getCurrentPlayers();
     if (this.currentPlayers.length < 2) {
       this._round = this.roundNum + 1;
     }
