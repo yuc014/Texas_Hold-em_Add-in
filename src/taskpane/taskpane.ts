@@ -62,7 +62,7 @@ export async function prepareTableAndSheet() {
       await createWorksheetIfNotExist(globalThis.gameSheetName);
       await context.sync();
       var gameSheet = sheets.getItem(globalThis.gameSheetName);
-      gameSheet.activate();
+      //gameSheet.activate();
       gameSheet.position = 1;
 
       await createTableIfNotExist(
@@ -432,16 +432,16 @@ async function changeScoreTableDataFromAction(_userAction: UserAction, action: s
 
       var skipCount;
       switch (_userAction.turn) {
-        case "pre-flop":
+        case "Pre-flop":
           skipCount = 3;
           break;
-        case "flop":
+        case "Flop round":
           skipCount = 4;
           break;
-        case "turn":
+        case "Turn round":
           skipCount = 5;
           break;
-        case "river":
+        case "River round":
           skipCount = 6;
           break;
         default:
