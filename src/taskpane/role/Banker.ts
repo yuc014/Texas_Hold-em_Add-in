@@ -1,4 +1,4 @@
-import { getCurrentPlayers, prepareCard } from '../taskpane';
+import { gameFinish, getCurrentPlayers, prepareCard } from '../taskpane';
 
 var rowOffset = 0;
 var colOffset = 0;
@@ -80,7 +80,7 @@ export class Banker {
 
   private async process() {
     if (this._round > this.roundNum) {
-      // finish one game, call main func
+      gameFinish();
       return;
     }
 
