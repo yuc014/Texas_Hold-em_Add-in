@@ -341,8 +341,6 @@ async function createTableIfNotExist(
         table.name = tableName;
       }
     });
-
-   
   } catch (error) {
     console.error(error);
   }

@@ -11,7 +11,7 @@ export function Countdown() {
     ringColor: "#ffc720", // 进度条环形颜色
     innerColor: "#4e84e5", // 最内圆底色
     fontSize: 50,
-    time: 2000,
+    time: 10,
   };
 }
 

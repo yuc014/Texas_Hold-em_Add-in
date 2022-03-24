@@ -28,6 +28,7 @@
     display:block;
     width:100%;
     /*height:200px;*/
+    text-align: center;
  }
 
  .ms-welcome__main {
@@ -170,4 +171,15 @@ button.site2 {
   }
 button.site:after{
   display: none;
+}
+
+
+#userButtons button {
+  display: inline;
+  width: 100px;
+  margin-right: 20px;
+}
+
+#canvas {
+  margin-bottom: 20px;
 }
