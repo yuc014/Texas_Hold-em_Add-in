@@ -1,5 +1,4 @@
 import { waitForUserAction, updateUITitle } from "../utils/waitUserAction";
-
 /*
  * Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT license.
  * See LICENSE in the project root for license information.
@@ -35,11 +34,15 @@ declare global {
   var playerInfoSheetName: string;
   var curPlayerName: string;
   var initMoney: number;
+  var sheetname: string;
+  var communityCardTextBox: string;
   var playerInfoDict: Dictionary<string, PlayerProp>;
   var smallBlind: number; // start from 1
   var communityCard: Card[];
   var cardSet: CardSet;
 }
+globalThis.sheetName = "Sheet1";
+globalThis.communityCardTextBox = "TextBox 3";
 globalThis.initMoney = 5000;
 globalThis.playerInfoDict = new Dictionary();
 globalThis.playerInfoSheetName = "playerInfo";
@@ -168,6 +171,21 @@ export async function submitName() {
   }
 }
 
+function getCommunityCardsString(communityCards: Card[]) {
+  var result = "";
+  communityCards.forEach((communityCard) => {
+    result += communityCard.toDisplayString() + "  ";
+  });
+  return result;
+}
+
+function updateCommunityCards(context, communityCards: Card[]) {
+  var shapes = context.workbook.worksheets.getItem(globalThis.sheetname).shapes;
+  const communityCard = shapes.getItem(globalThis.communityCardTextBox);
+  var val = getCommunityCardsString(communityCards);
+  communityCard.textFrame.textRange.text = val;
+}
+
 async function onHighlight(e) {
   console.log(e);
   let address = e.address;
@@ -250,6 +268,7 @@ async function registerOnChangeEvent() {
 export async function start() {
   try {
     await Excel.run(async (context) => {
+      
       // do the process
       var banker = new Banker();
       banker.startGame();
