@@ -11,6 +11,9 @@ import Dictionary from "./Dictionary";
 import PlayerProp from "./playerProp";
 import { Card, Suits } from "../utils/Card";
 import { CardSet } from "./role/CardSet";
+import { setCell } from "src/utils/setCell";
+import RoundPlayer from "src/utils/round_player";
+import { chooseWinners } from "src/utils/rankHand";
 
 Office.onReady(async (info) => {
   if (info.host === Office.HostType.Excel) {
@@ -89,6 +92,7 @@ export async function prepareTableAndSheet() {
         }
         await context.sync();
       });
+      gameSheet.getRange("L10").values = [["=SUM(H10:K10)"]];
       await context.sync();
     });
   } catch (error) {
@@ -585,7 +589,7 @@ async function showCommunityCards() {
       range = range.getOffsetRange(0, 1);
       for (let index = 0; index < globalThis.communityCard.length; index++) {
         var card = globalThis.communityCard[index];
-        range.values = [[card.toPokerSolver()]];
+        setCell(context, range, card);
         range = range.getOffsetRange(0, 1);
       }
       await context.sync();
@@ -629,9 +633,9 @@ async function showHands() {
         });
         nameInTable.load();
         var range = nameInTable.getOffsetRange(0, 1);
-        range.values = [[value.hand[0].toPokerSolver()]];
+        setCell(context, range, value.hand[0]);
         range = nameInTable.getOffsetRange(0, 2);
-        range.values = [[value.hand[1].toPokerSolver()]];
+        setCell(context, range, value.hand[1]);
       });
       await context.sync();
       var af = table.autoFilter;
@@ -730,6 +734,47 @@ export async function getCurrentPlayers(): Promise<Array<number>> {
       console.log(resIdx);
       await context.sync();
       return resIdx;
+    });
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+export async function gameFinish() {
+  try {
+    return await Excel.run(async (context) => {
+      var roundPlayers;
+      var table = context.workbook.worksheets
+        .getItem(globalThis.gameSheetName)
+        .tables.getItem(globalThis.scoreTableName);
+      await globalThis.playerInfoDict.forEach(function (key, value) {
+        var nameInTable = table.columns.getItemAt(1).getDataBodyRange().findOrNullObject(value.name, {
+          completeMatch: true,
+          matchCase: true,
+        });
+        nameInTable.load();
+        var range = nameInTable.getOffsetRange(0, 8);
+        range.load("values");
+        var player = new RoundPlayer(key, value.status == "fold", value.hand, value.money, +range.values[0][0]);
+        roundPlayers.push(player);
+      });
+
+      var winners = chooseWinners(globalThis.communityCard, roundPlayers);
+
+      await winners.forEach(function (element) {
+        var nameInTable = table.columns.getItemAt(1).getDataBodyRange().findOrNullObject(element.name, {
+          completeMatch: true,
+          matchCase: true,
+        });
+        nameInTable.load();
+        nameInTable.format.fill.color = "Green";
+        var Potrange = nameInTable.getOffsetRange(0, 3);
+        Potrange.values = [[element.chips]];
+      });
+
+      globalThis.playerInfoDict = new Dictionary();
+      globalThis.smallBlind += 1;
+      globalThis.communityCard = [];
     });
   } catch (error) {
     console.error(error);
